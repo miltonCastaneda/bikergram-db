@@ -40,5 +40,5 @@ test('save image', async t => {
   t.is(created.liked, image.liked)
   t.is(created.user_id, image.user_id)
   t.is(typeof created.id, 'string')
-  t.truthy(created.createAt)
+  t.truthy(created.createdAt)
 })
