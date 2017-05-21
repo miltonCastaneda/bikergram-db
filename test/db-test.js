@@ -6,26 +6,30 @@ const r = require('rethinkdb')
 const Db = require('../')
 const fixtures = require('./fixtures')
 
-const dbName = `bikergram_${uuid.v4()}`
-const db = new Db({ db: dbName })
 // se ejecuta antes del test
-test.before('setup database', async t => {
+test.beforeEach('setup database', async t => {
+  const dbName = `platzigram_${uuid.v4()}`
+  const db = new Db({ db: dbName })
   await db.connect()
+  t.context.db = db
+  t.context.dbName = dbName
   t.true(db.connected, 'should be conncected')
 })
 // se ejecuta despues de los test a menos de que se interrumpa la ejecucion
-test.after('disconnect database', async t => {
+test.afterEach.always('disconnect database', async t => {
+  let db = t.context.db
+  let dbName = t.context.dbName
+
   await db.disconnect()
   t.false(db.connected, 'should be disconnected')
-})
 
-// siempre se ejecuta despues de todos los test
-test.after.always('cleanup database', async t => {
   let conn = await r.connect({})
   await r.dbDrop(dbName).run(conn)
 })
 
 test('save image', async t => {
+  let db = t.context.db
+
   t.is(typeof db.saveImage, 'function', 'saveImage is function')
 
   let image = fixtures.getImage()
@@ -43,6 +47,7 @@ test('save image', async t => {
 })
 
 test('like image', async t => {
+  let db = t.context.db
   t.is(typeof db.likeImage, 'function', 'like is a function')
 
   let image = fixtures.getImage()
@@ -51,4 +56,25 @@ test('like image', async t => {
 
   t.true(result.liked)
   t.is(result.likes, image.likes + 1)
+})
+
+test('get image', async t => {
+  let db = t.context.db
+  t.is(typeof db.getImage, 'function', 'getImage is a function')
+
+  let image = fixtures.getImage()
+  let created = await db.saveImage(image)
+  let result = await db.getImage(created.public_id)
+
+  t.deepEqual(created, result)
+})
+
+test('list all images', async t => {
+  let db = t.context.db
+  let images = fixtures.getImages(3)
+  let saveImages = images.map(img => db.saveImage(img))
+  let created = await Promise.all(saveImages)
+  let result = await db.getImages()
+
+  t.is(created.length, result.length)
 })
